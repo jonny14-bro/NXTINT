@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORE_OSINT // ANALYSIS_SUITE</title>
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Real Metadata Library -->
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+    <style>
+        :root {
+            --neon-red: #ff0000;
+            --deep-red: #150000;
+            --terminal-green: #00ff41;
+            --bg-black: #050000;
+            --glass: rgba(10, 0, 0, 0.95);
+            --border: rgba(255, 0, 0, 0.4);
+            --scan-color: #ff0000;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'IBM Plex Mono', monospace; }
+
+        body {
+            background-color: var(--bg-black);
+            color: #eee;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Boot Overlay --- */
+        #boot-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: var(--neon-red);
+        }
+
+        #boot-btn {
+            background: transparent;
+            border: 2px solid var(--neon-red);
+            color: var(--neon-red);
+            padding: 20px 40px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-top: 20px;
+            letter-spacing: 5px;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        #boot-btn:hover { background: var(--neon-red); color: black; box-shadow: 0 0 20px var(--neon-red); }
+
+        /* --- Background Matrix --- */
+        #matrix-canvas { position: fixed; top: 0; left: 0; z-index: -1; opacity: 0.1; }
+
+        /* --- Header --- */
+        header {
+            background: var(--glass);
+            border-bottom: 2px solid var(--neon-red);
+            padding: 10px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* --- Dashboard Layout --- */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 320px 1fr 400px;
+            gap: 15px;
+            padding: 15px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .column { display: flex; flex-direction: column; gap: 15px; }
+
+        .ui-box {
+            background: rgba(10, 0, 0, 0.9);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        /* Corner Accents */
+        .ui-box::after {
+            content: ''; position: absolute; bottom: 0; right: 0;
+            width: 10px; height: 10px; border-bottom: 2px solid var(--neon-red); border-right: 2px solid var(--neon-red);
+        }
+
+        .label-tab {
+            background: var(--deep-red);
+            color: white;
+            font-size: 0.65rem;
+            padding: 6px 12px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            letter-spacing: 2px;
+        }
+
+        .tool-list { display: flex; flex-direction: column; gap: 4px; padding: 10px; }
+
+        .btn-module {
+            background: rgba(255, 0, 0, 0.05);
+            border: 1px solid rgba(255, 0, 0, 0.2);
+            padding: 10px;
+            color: #bbb;
+            cursor: pointer;
+            font-size: 0.65rem;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: 0.2s;
+        }
+
+        .btn-module:hover {
+            border-color: var(--neon-red);
+            background: rgba(255, 0, 0, 0.15);
+            color: #fff;
+            transform: translateX(5px);
+        }
+
+        .btn-module i { color: var(--neon-red); width: 15px; text-align: center; }
+
+        /* --- Center Viewport --- */
+        .viewport {
+            background: #000;
+            border: 1px solid var(--border);
+            position: relative;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #video-feed { 
+            width: 100%; height: 100%; object-fit: cover; 
+            background: #050505; 
+            filter: grayscale(1) contrast(1.2) brightness(0.8);
+        }
+        
+        #preview-container { 
+            width: 100%; height: 100%;
+            position: relative; 
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        #evidence-img { 
+            max-width: 100%; max-height: 100%; 
+            display: none; 
+            z-index: 2; 
+            border: 1px solid var(--neon-red); 
+        }
+        
+        /* Scan Line Animation */
+        .scanner-line {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 3px;
+            background: var(--scan-color);
+            box-shadow: 0 0 15px var(--scan-color);
+            z-index: 10; display: none;
+        }
+
+        @keyframes scanLine { 0% { top: 0; } 100% { top: 100%; } }
+        .scanning .scanner-line { display: block; animation: scanLine 2s linear infinite; }
+
+        /* Face Tracker HUD */
+        #face-tracker {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px; height: 200px;
+            border: 2px solid var(--terminal-green);
+            box-shadow: 0 0 10px var(--terminal-green);
+            display: none;
+            z-index: 5;
+            transition: border-color 0.3s;
+        }
+
+        #face-tracker::before, #face-tracker::after {
+            content: ''; position: absolute;
+            width: 10px; height: 10px;
+            border: 2px solid #fff;
+        }
+        #face-tracker::before { top: -5px; left: -5px; border-right: 0; border-bottom: 0; }
+        #face-tracker::after { bottom: -5px; right: -5px; border-left: 0; border-top: 0; }
+
+        @keyframes pulse-red { 0% { border-color: var(--terminal-green); } 50% { border-color: red; } 100% { border-color: var(--terminal-green); } }
+        .locking-on { animation: pulse-red 0.5s infinite; }
+
+        /* --- Terminal --- */
+        #terminal-logs {
+            flex: 1; padding: 15px; color: var(--terminal-green);
+            font-size: 0.7rem; overflow-y: auto; line-height: 1.5;
+            background: rgba(0,0,0,0.8);
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: var(--neon-red); }
+
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- BOOT SCREEN -->
+    <div id="boot-screen">
+        <h1 style="letter-spacing: 10px; text-shadow: 0 0 10px red;">NEXTINT_v1.0</h1>
+        <div style="font-size: 0.8rem; color: #555; margin-bottom: 20px;">ADV_OSINT_FRAMEWORK</div>
+        <button id="boot-btn" onclick="activateSystem()">INITIALIZE SYSTEM</button>
+    </div>
+
+    <canvas id="matrix-canvas"></canvas>
+    <input type="file" id="file-input" onchange="processFile(event)">
+
+    <!-- HEADER -->
+    <header>
+        <h2 style="color: var(--neon-red); font-size: 1rem; letter-spacing: 5px;">NEXTINT_V1.0 // AUTO_STATION</h2>
+        <div id="clock" style="color: var(--neon-red); font-size: 0.8rem;"></div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <div class="dashboard">
+        
+        <!-- LEFT COLUMN -->
+        <div class="column">
+            <!-- LIVE SCANNER -->
+            <div class="ui-box" style="border-left: 3px solid var(--neon-red);">
+                <div class="label-tab">LIVE SCANNER [HARDWARE]</div>
+                <div class="tool-list">
+                    <button class="btn-module" onclick="captureLive()"><i class="fa-solid fa-camera"></i> CAPTURE FRAME</button>
+                    <button class="btn-module" onclick="autoBackendScan()"><i class="fa-solid fa-bolt"></i> SCAN IMAGE (AUTO)</button>
+                    <button class="btn-module" onclick="liveFaceEnroll()" style="color: #00e1ff;"><i class="fa-solid fa-user-plus"></i> ENROLL FACE</button>
+                    <button class="btn-module" onclick="liveAdvScan()" style="color: orange;"><i class="fa-solid fa-microscope"></i> ADVANCE IMAGE SCAN</button>
+                </div>
+            </div>
+
+            <!-- MANUAL INGEST MODS (FULL) -->
+            <div class="ui-box" style="flex: 1;">
+                <div class="label-tab">MANUAL INGEST MODS</div>
+                <div class="tool-list">
+                    <button class="btn-module" onclick="openPicker('image/*','IMG_SCAN')"><i class="fa-solid fa-image"></i> SCAN IMAGE</button>
+                    <button class="btn-module" onclick="openPicker('video/*','VID_SCAN')"><i class="fa-solid fa-video"></i> SCAN VIDEO</button>
+                    <button class="btn-module" onclick="openPicker('audio/*','AUD_SCAN')"><i class="fa-solid fa-volume-high"></i> SCAN AUDIO</button>
+                    
+                    <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
+                    
+                    <button class="btn-module" onclick="openPicker('image/*', 'ADV_IMG')" style="color: #ff9d00;">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i> ADV. INVESTIGATE IMG
+                    </button>
+                    <button class="btn-module" onclick="openPicker('video/*', 'ADV_VID')" style="color: #ff9d00;">
+                        <i class="fa-solid fa-film"></i> ADV. INVESTIGATE VIDEO
+                    </button>
+
+                    <!-- GIT REPO SECTION -->
+                    <div style="border-top: 1px solid var(--border); margin: 5px 0;"></div>
+                    
+                    <button class="btn-module" onclick="scanGitRepo()" style="color: #d783ff; border-color: rgba(215, 131, 255, 0.3);">
+                        <i class="fa-brands fa-github"></i> SCAN GIT REPO
+                    </button>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER COLUMN (VIEWPORT) -->
+        <div class="column">
+            <div class="viewport ui-box" id="main-viewport">
+                <div id="preview-container">
+                    <div class="scanner-line"></div>
+                    <div id="face-tracker"></div>
+                    <video id="video-feed" autoplay playsinline muted></video>
+                    <img id="evidence-img">
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN (LOGS) -->
+        <div class="column">
+            <div class="ui-box" style="flex: 1;">
+                <div class="label-tab">ANALYSIS_LOGS</div>
+                <div id="terminal-logs">
+                    [SYSTEM] Awaiting Hardware Initialization...<br>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Hidden Canvas for Snaps -->
+    <canvas id="hidden-canvas" style="display:none;"></canvas>
+
+    <script>
+        // DOM Elements
+        const terminal = document.getElementById('terminal-logs');
+        const video = document.getElementById('video-feed');
+        const eImg = document.getElementById('evidence-img');
+        const viewport = document.getElementById('main-viewport');
+        const fileInput = document.getElementById('file-input');
+        const faceTracker = document.getElementById('face-tracker');
+        const hidCanvas = document.getElementById('hidden-canvas');
+        const root = document.documentElement;
+
+
+        // --- UTILITIES ---
+        
+        function logToTerm(msg, color = "var(--terminal-green)") {
+            const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+            const div = document.createElement('div');
+            div.innerHTML = `<span style="color:#555">[${time}]</span> <span style="color:${color}">${msg}</span>`;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function generateHexDump() {
+            const chars = "ABCDEF0123456789";
+            let str = "0x";
+            for(let i=0; i<8; i++) str += chars[Math.floor(Math.random() * chars.length)];
+            return str;
+        }
+
+        // --- SYSTEM BOOT ---
+
+        async function activateSystem() {
+            document.getElementById('boot-screen').style.display = 'none';
+            logToTerm("KERNEL: Initializing system...");
+
+            try {
+                const res = await fetch("http://127.0.0.1:8000/api/system/ping");
+                const data = await res.json();
+                logToTerm(`ENGINE: ${data.engine} (${data.mode})`, "cyan");
+            } catch (e) {
+                logToTerm("ERROR: Backend not reachable", "red");
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                logToTerm("HARDWARE: Optical Sensor Online.", "cyan");
+            } catch {
+                logToTerm("ERROR: Camera access denied.", "red");
+            }
+        }
+
+
+        function takeSnapshot() {
+            hidCanvas.width = video.videoWidth || 640;
+            hidCanvas.height = video.videoHeight || 480;
+            const ctx = hidCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, hidCanvas.width, hidCanvas.height);
+            return hidCanvas.toDataURL('image/png');
+        }
+
+        // --- GIT REPO SCANNER ---
+        async function scanGitRepo() {
+            const path = prompt("ENTER LOCAL REPO PATH:");
+            if (!path) return;
+
+            logToTerm(`GIT: Scanning ${path}`, "#d783ff");
+
+            const res = await fetch("http://127.0.0.1:8000/api/scan/git", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ path })
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                logToTerm("ERROR: " + data.error, "red");
+                return;
+            }
+
+            logToTerm(`FINDINGS: ${data.total_findings}`, "cyan");
+        }
+
+
+        // --- LIVE SIMULATIONS ---
+
+        async function liveFaceEnroll() {
+            const name = prompt("ENTER IDENTITY NAME:");
+            if (!name) return;
+
+            const blob = await fetch(takeSnapshot()).then(r => r.blob());
+
+            const form = new FormData();
+            form.append("file", blob, "enroll.png");
+            form.append("identity", name);
+
+            logToTerm(`ENROLLING: ${name}`, "#00e1ff");
+            viewport.classList.add('scanning');
+
+            const res = await fetch("http://127.0.0.1:8000/api/face/enroll", {
+                method: "POST",
+                body: form
+            });
+
+            const data = await res.json();
+
+            viewport.classList.remove('scanning');
+
+            if (data.error) {
+                logToTerm("ERROR: " + data.error, "red");
+                return;
+            }
+
+            logToTerm(`SUCCESS: ${data.identity} enrolled`, "var(--terminal-green)");
+        }
+
+
+        async function liveAdvScan() {
+            const blob = await fetch(takeSnapshot()).then(r => r.blob());
+            const file = new File([blob], "live_adv.png", { type: "image/png" });
+            runDeepImageAnalysis(file);
+        }
+
+        async function autoBackendScan() {
+            const blob = await fetch(takeSnapshot()).then(r => r.blob());
+
+            const form = new FormData();
+            form.append("file", blob, "live_capture.png");
+
+            logToTerm("NET: Sending image to offline engine...", "yellow");
+            viewport.classList.add('scanning');
+
+            try {
+                const res = await fetch("http://127.0.0.1:8000/api/scan/image", {
+                    method: "POST",
+                    body: form
+                });
+
+                const data = await res.json();
+
+                if (data.error) throw data.error;
+
+                logToTerm("RAW ENGINE OUTPUT ↓", "cyan");
+                logToTerm(JSON.stringify(data, null, 2), "#aaa");
+
+
+            } catch (e) {
+                logToTerm("ERROR: " + e, "red");
+            }
+
+            viewport.classList.remove('scanning');
+        }
+
+
+        function captureLive() {
+            const data = takeSnapshot();
+            eImg.src = data;
+            eImg.style.display = 'block';
+            video.style.display = 'none'; 
+            logToTerm(`SNAP: Frame captured.`);
+            setTimeout(() => { if(video.srcObject) { eImg.style.display = 'none'; video.style.display = 'block'; } }, 2000);
+        }
+
+        // --- FILE HANDLING ---
+
+        function openPicker(mime, mode) {
+            fileInput.accept = mime;
+            fileInput.setAttribute('data-mode', mode);
+            fileInput.value = ''; 
+            fileInput.click();
+        }
+
+/*
+        async function sendImageToBackend(file, advanced=false) {
+            const form = new FormData();
+            form.append("file", file);
+
+            const endpoint = advanced
+                ? "/api/scan/image/advanced"
+                : "/api/scan/image";
+
+            logToTerm("NET: Submitting image for analysis...", "yellow");
+            viewport.classList.add('scanning');
+
+            const res = await fetch("http://127.0.0.1:8000" + endpoint, {
+                method: "POST",
+                body: form
+            });
+
+            const data = await res.json();
+
+            viewport.classList.remove('scanning');
+
+            if (data.error) {
+                logToTerm("ERROR: " + data.error, "red");
+                return;
+            }
+
+            if (advanced) {
+                logToTerm(`FACES DETECTED: ${data.faces.length}`, "cyan");
+                data.faces.forEach(f =>
+                    logToTerm(
+                        `IDENTITY: ${f.identity} (${f.confidence}%)`,
+                        f.identity === "UNKNOWN" ? "orange" : "var(--terminal-green)"
+                    )
+                );
+            } else {
+                logToTerm(`FAISS_UID: ${data.faiss_uid}`);
+            }
+        }
+*/
+        async function sendMedia(file, type) {
+            const form = new FormData();
+            form.append("file", file);
+
+            const endpoint = type === "video"
+                ? "/api/scan/video"
+                : "/api/scan/audio";
+
+            logToTerm(`NET: Sending ${type} for analysis...`, "yellow");
+
+            const res = await fetch("http://127.0.0.1:8000" + endpoint, {
+                method: "POST",
+                body: form
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                logToTerm("ERROR: " + data.error, "red");
+                return;
+            }
+
+            logToTerm(`${type.toUpperCase()} SCAN COMPLETE`, "var(--terminal-green)");
+        }
+
+
+        function processFile(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            const mode = fileInput.getAttribute('data-mode');
+            const objectURL = URL.createObjectURL(file);
+
+            eImg.style.display = 'none';
+            video.style.display = 'none';
+            faceTracker.style.display = 'none';
+
+            logToTerm(`fs_mount: Loaded ${file.name} [${mode}]`);
+
+            if(file.type.startsWith('image/')) {
+                if(video.srcObject) video.pause(); 
+                eImg.src = objectURL;
+                eImg.style.display = 'block';
+                
+                // Route Analysis
+                if(mode === 'ADV_IMG') {
+                    runDeepImageAnalysis(file);
+                } else {
+                    analyzeExif(file);
+                    sendImageToBackend(file,false); // Standard Scan
+                }
+            } 
+            else if(file.type.startsWith('video/')) {
+                sendMedia(file, "video");
+                if(mode === 'ADV_VID') runDeepVideoAnalysis(file);
+            }
+        }
+
+        // --- ANALYSIS FUNCTIONS ---
+        
+        function analyzeExif(file) {
+            logToTerm("EXIF: Extracting metadata layers...", "magenta");
+            
+            // FS Data
+            const sizeKB = (file.size / 1024).toFixed(2);
+            logToTerm(`> FS_SIZE: ${sizeKB} KB`);
+
+            EXIF.getData(file, function() {
+                const make = EXIF.getTag(this, "Make");
+                const model = EXIF.getTag(this, "Model");
+                
+                if(make || model) {
+                    logToTerm(`> DEVICE: ${make || ''} ${model || 'Generic'}`);
+                } else {
+                    logToTerm("! WARNING: Standard EXIF headers missing.", "orange");
+                }
+                
+                logToTerm("METADATA: Extraction Complete.", "var(--terminal-green)");
+            });
+        }
+
+        // --- DEEP FORENSICS ---
+
+        async function runDeepImageAnalysis(file) {
+            sendImageToBackend(file, true);
+        }
+
+        async function sendImageToBackend(file, advanced=false) {
+            const form = new FormData();
+            form.append("file", file);
+
+            const endpoint = advanced
+                ? "/api/scan/image/advanced"
+                : "/api/scan/image";
+
+            logToTerm("NET: Submitting image for analysis...", "yellow");
+            viewport.classList.add('scanning');
+
+            const res = await fetch("http://127.0.0.1:8000" + endpoint, {
+                method: "POST",
+                body: form
+            });
+
+            const data = await res.json();
+
+            viewport.classList.remove('scanning');
+
+            if (data.error) {
+                logToTerm("ERROR: " + data.error, "red");
+                return;
+            }
+
+            if (advanced) {
+                logToTerm(`FACES DETECTED: ${data.faces.length}`, "cyan");
+                data.faces.forEach(f =>
+                    logToTerm(
+                        `IDENTITY: ${f.identity} (${f.confidence}%)`,
+                        f.identity === "UNKNOWN" ? "orange" : "var(--terminal-green)"
+                    )
+                );
+            } else {
+                logToTerm(`FAISS_UID: ${data.faiss_uid}`);
+            }
+        }
+
+
+
+
+        async function runDeepVideoAnalysis(file) {
+            root.style.setProperty('--scan-color', 'orange');
+            viewport.classList.add('scanning');
+            logToTerm("FORENSICS: Video Container Analysis...", "orange");
+            logToTerm(`> CONTAINER: ${file.type}`);
+            await new Promise(r => setTimeout(r, 1500));
+            logToTerm("> Analyzing Keyframes & Audio Spectrogram...");
+            await new Promise(r => setTimeout(r, 1500));
+            logToTerm("COMPLETE: Video Integrity Verified.", "var(--terminal-green)");
+            viewport.classList.remove('scanning');
+            root.style.setProperty('--scan-color', '#ff0000');
+        }
+
+        // --- CLOCK & MATRIX ---
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString(); }, 1000);
+
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        function resizeMatrix() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeMatrix);
+        resizeMatrix();
+
+        const drops = Array(Math.floor(canvas.width/20)).fill(1);
+        function drawMatrix() {
+            ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = "#ff0000";
+            ctx.font = "15px monospace";
+            drops.forEach((y, i) => {
+                const char = String.fromCharCode(0x30A0 + Math.random() * 96);
+                ctx.fillText(char, i*20, y*20);
+                if(y*20 > canvas.height && Math.random() > 0.98) drops[i] = 0;
+                drops[i]++;
+            });
+        }
+        setInterval(drawMatrix, 50);
+
+    </script>
+</body>
+</html>

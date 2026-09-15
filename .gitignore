@@ -1,0 +1,102 @@
+# ==============================
+# Python
+# ==============================
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ==============================
+# Virtual environments
+# ==============================
+.venv/
+venv/
+env/
+ENV/
+
+# ==============================
+# Environment / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# IDE
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# OS
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Logs
+# ==============================
+*.log
+logs/
+
+# ==============================
+# Runtime / generated data
+# ==============================
+data/
+runtime/
+temp/
+tmp/
+
+# ==============================
+# Investigation data
+# ==============================
+osint_records.json
+face_identities.json
+admin_config.json
+
+# ==============================
+# FAISS generated indexes
+# ==============================
+*.faiss
+*faiss_meta.json
+
+# ==============================
+# Media / generated metadata
+# ==============================
+media_metadata/
+
+# ==============================
+# Large ML model artifacts
+# ==============================
+*.pt
+*.pth
+*.onnx
+
+# ==============================
+# Local databases
+# ==============================
+*.db
+*.sqlite
+*.sqlite3
+
+# ==============================
+# Testing / caches
+# ==============================
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ==============================
+# Build artifacts
+# ==============================
+build/
+dist/
+*.egg-info/
+
+# ==============================
+# Credentials
+# ==============================
+credentials.json
+secrets.json
