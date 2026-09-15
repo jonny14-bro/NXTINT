@@ -134,28 +134,39 @@ NXTINT V1/
 
 ### Backend & AI
 
-- **Python** — Core application and intelligence processing
-- **Flask** — REST API and application server
-- **FAISS** — Vector similarity search and indexing
-- **Machine Learning** — Evidence-based decision modeling
-- **Semantic Processing** — Intelligence normalization and similarity analysis
+<p align="center">
+  <img src="https://skillicons.dev/icons?i=python,flask" />
+  <br>
+  <sub>Python • Flask</sub>
+</p>
 
 ### Frontend & Visuals
 
-- **HTML5** — Interface structure
-- **CSS3** — Styling and responsive visual presentation
-- **JavaScript** — Client-side interaction and API communication
-- **Python UI Layer** — Application-level UI integration
-- **Flask** — Frontend/backend communication
+<p align="center">
+  <img src="https://skillicons.dev/icons?i=html,css,js" />
+  <br>
+  <sub>HTML5 • CSS3 • JavaScript</sub>
+</p>
 
-### Intelligence & Security
+### Development & Infrastructure
 
-- **OSINT Processing** — Investigation data ingestion and normalization
-- **Evidence Analysis** — Multi-factor evidence evaluation
-- **Timeline Intelligence** — Temporal investigation and reconstruction
-- **Audit & Integrity** — Data validation and integrity mechanisms
-- **Vector Intelligence** — FAISS-powered similarity and retrieval
+<p align="center">
+  <img src="https://skillicons.dev/icons?i=git,github,vscode,linux" />
+  <br>
+  <sub>Git • GitHub • VS Code • Linux</sub>
+</p>
 
+### AI / Intelligence Technologies
+
+<p align="center">
+
+![FAISS](https://img.shields.io/badge/FAISS-Vector_Search-00ADD8?style=for-the-badge)
+
+![Machine Learning](https://img.shields.io/badge/Machine_Learning-Decision_Model-FF6F00?style=for-the-badge)
+
+![OSINT](https://img.shields.io/badge/OSINT-Intelligence-6A5ACD?style=for-the-badge)
+
+</p>
 ---
 
 ## 🔍 Major Components
